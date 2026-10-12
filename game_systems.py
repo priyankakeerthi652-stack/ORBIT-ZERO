@@ -4,6 +4,9 @@
 class GameSystems:
     """Track score, progression, and gameplay resources."""
 
+    PLAYING = "playing"
+    PAUSED = "paused"
+    GAME_OVER = "game_over"
     _SCORE_PER_WAVE = 1000
 
     def __init__(self) -> None:
@@ -16,7 +19,7 @@ class GameSystems:
         """Increase the score by a non-negative amount and advance waves."""
         if amount < 0:
             raise ValueError("Score increase must be non-negative.")
-        if self.game_state != "playing":
+        if self.game_state != self.PLAYING:
             return
 
         self.score += amount
@@ -26,32 +29,32 @@ class GameSystems:
         """Reduce stability by a non-negative amount, ending the run at zero."""
         if amount < 0:
             raise ValueError("Stability damage must be non-negative.")
-        if self.game_state != "playing":
+        if self.game_state != self.PLAYING:
             return
 
         self.stability = max(0, self.stability - amount)
         if self.stability == 0:
-            self.game_state = "game_over"
+            self.game_state = self.GAME_OVER
 
     def restore_stability(self, amount: int) -> None:
         """Restore stability by a non-negative amount, up to its maximum."""
         if amount < 0:
             raise ValueError("Stability recovery must be non-negative.")
-        if self.game_state == "playing":
+        if self.game_state == self.PLAYING:
             self.stability = min(self.max_stability, self.stability + amount)
 
     def add_resonance(self, amount: int) -> None:
         """Increase resonance by a non-negative amount, up to its maximum."""
         if amount < 0:
             raise ValueError("Resonance increase must be non-negative.")
-        if self.game_state == "playing":
+        if self.game_state == self.PLAYING:
             self.resonance = min(self.max_resonance, self.resonance + amount)
 
     def spend_resonance(self, amount: int) -> bool:
         """Spend resonance if enough is available; return whether it succeeded."""
         if amount < 0:
             raise ValueError("Resonance cost must be non-negative.")
-        if self.game_state != "playing" or self.resonance < amount:
+        if self.game_state != self.PLAYING or self.resonance < amount:
             return False
 
         self.resonance -= amount
@@ -59,20 +62,20 @@ class GameSystems:
 
     def is_game_over(self) -> bool:
         """Return whether stability has reached zero."""
-        return self.game_state == "game_over"
+        return self.game_state == self.GAME_OVER
 
     def pause(self) -> bool:
         """Pause an active run and report whether it was paused."""
-        if self.game_state != "playing":
+        if self.game_state != self.PLAYING:
             return False
-        self.game_state = "paused"
+        self.game_state = self.PAUSED
         return True
 
     def resume(self) -> bool:
         """Resume a paused run and report whether it was resumed."""
-        if self.game_state != "paused":
+        if self.game_state != self.PAUSED:
             return False
-        self.game_state = "playing"
+        self.game_state = self.PLAYING
         return True
 
     def reset(self) -> None:
@@ -81,4 +84,4 @@ class GameSystems:
         self.wave = 1
         self.stability = self.max_stability
         self.resonance = 0
-        self.game_state = "playing"
+        self.game_state = self.PLAYING
