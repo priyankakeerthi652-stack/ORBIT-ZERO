@@ -91,8 +91,11 @@ class Environment:
 			color = (brightness, min(255, brightness + 8), min(255, brightness + 22))
 			x, y = int(star["x"]), int(star["y"])
 			pygame.draw.circle(screen, color, (x, y), star["radius"])
-			if star["radius"] >= 2:
-				pygame.draw.line(screen, color, (x, y + 2), (x, y + 5), 1)
+			if star["layer"] == 2:
+				trail = 4 + star["radius"]
+				pygame.draw.line(screen, color, (x, y + 2), (x, y + trail), 1)
+			elif star["layer"] == 1 and star["radius"] >= 2:
+				pygame.draw.line(screen, color, (x, y + 2), (x, y + 4), 1)
 
 		for particle in self._particles:
 			fade = min(1.0, particle["life"] / 12)
@@ -108,12 +111,20 @@ class Environment:
 			self._draw_stability_distortion(screen, instability)
 
 	def _new_star(self, random_y):
+		layer = self._rng.choices((0, 1, 2), weights=(5, 3, 2))[0]
+		layer_properties = (
+			(0.2, 0.75, (1,), (75, 155)),
+			(0.7, 1.6, (1, 2), (105, 195)),
+			(1.5, 3.0, (1, 2, 3), (145, 235)),
+		)
+		speed_min, speed_max, radii, brightness_range = layer_properties[layer]
 		return {
 			"x": self._rng.uniform(0, self.width),
 			"y": self._rng.uniform(0, self.height) if random_y else -2,
-			"speed": self._rng.uniform(0.55, 2.5),
-			"radius": self._rng.choices((1, 2, 3), weights=(7, 2, 1))[0],
-			"brightness": self._rng.randint(115, 225),
+			"speed": self._rng.uniform(speed_min, speed_max),
+			"radius": self._rng.choice(radii),
+			"brightness": self._rng.randint(*brightness_range),
+			"layer": layer,
 			"twinkle": self._rng.uniform(0, math.tau),
 		}
 
@@ -137,20 +148,31 @@ class Environment:
 			color = tuple(int(a + (b - a) * amount * 0.48) for a, b in zip(start, end))
 			pygame.draw.line(surface, color, (0, y), (self.width, y))
 
-		haze = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
-		accent = self.PHASES[phase][3]
-		for index in range(6, 0, -1):
-			width = int(self.width * (0.18 + index * 0.065))
-			height = int(self.height * (0.12 + index * 0.052))
-			x = int(self.width * (0.18 + (index % 3) * 0.28))
-			y = int(self.height * (0.2 + (index % 2) * 0.42))
-			color = (*accent, 3 + (7 - index) * 2)
+		# Build atmospheric depth once; only the cached surface is blitted per frame.
+		far_haze = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
+		near_haze = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
+		shadow = tuple(channel // 2 for channel in end)
+		light = tuple(min(255, channel + (255 - channel) // 3) for channel in end)
+		for index in range(8, 0, -1):
+			width = int(self.width * (0.2 + index * 0.06))
+			height = int(self.height * (0.1 + index * 0.045))
+			x = int(self.width * (0.16 + (index % 4) * 0.22))
+			y = int(self.height * (0.18 + (index % 3) * 0.3))
 			pygame.draw.ellipse(
-				haze,
-				color,
+				far_haze,
+				(*shadow, 4 + (8 - index)),
 				(x - width // 2, y - height // 2, width, height),
 			)
-		surface.blit(haze, (0, 0))
+			inner_width = int(width * 0.68)
+			inner_height = int(height * 0.62)
+			pygame.draw.ellipse(
+				near_haze,
+				(*light, 3 + (8 - index)),
+				(x - inner_width // 2, y - inner_height // 2,
+				 inner_width, inner_height),
+			)
+		surface.blit(far_haze, (0, 0))
+		surface.blit(near_haze, (0, 0))
 		return surface
 
 	def _draw_vortex(self, screen, instability):
